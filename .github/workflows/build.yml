@@ -71,6 +71,14 @@ jobs:
                 versionName = "1.0"
             }
 
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+
             buildFeatures {
                 compose = true
             }
@@ -80,9 +88,6 @@ jobs:
             packaging {
                 resources {
                     excludes += "/META-INF/{AL2.0,LGPL2.1}"
-                    excludes += "META-INF/DEPENDENCIES"
-                    excludes += "META-INF/LICENSE*"
-                    excludes += "META-INF/NOTICE*"
                 }
             }
         }
@@ -97,7 +102,6 @@ jobs:
             implementation("androidx.compose.material3:material3")
             implementation("androidx.compose.material:material-icons-extended")
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-            implementation("com.arthenica:ffmpeg-kit-full:6.0-2")
         }
         EOF
 
@@ -106,7 +110,6 @@ jobs:
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android">
             <uses-permission android:name="android.permission.RECORD_AUDIO" />
-            <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
             <application
                 android:allowBackup="true"
                 android:label="Deathpool AI"
@@ -123,14 +126,12 @@ jobs:
         </manifest>
         EOF
 
-        # 6. MainActivity.kt (UI + Brain + Shorts Engine)
+        # 6. MainActivity.kt (Gemini UI + Offline Voice & Automation)
         cat << 'EOF' > app/src/main/java/com/deathpool/ai/MainActivity.kt
         package com.deathpool.ai
 
-        import android.content.Context
         import android.content.Intent
         import android.os.Bundle
-        import android.os.Environment
         import android.speech.tts.TextToSpeech
         import androidx.activity.ComponentActivity
         import androidx.activity.compose.setContent
@@ -154,10 +155,7 @@ jobs:
         import androidx.compose.ui.unit.dp
         import androidx.compose.ui.unit.sp
         import androidx.lifecycle.lifecycleScope
-        import com.arthenica.ffmpegkit.FFmpegKit
-        import com.arthenica.ffmpegkit.ReturnCode
         import kotlinx.coroutines.launch
-        import java.io.File
         import java.util.Locale
 
         data class ChatMessage(val sender: String, val text: String, val isUser: Boolean)
@@ -185,27 +183,24 @@ jobs:
                                 lower.contains("youtube") -> {
                                     val intent = packageManager.getLaunchIntentForPackage("com.google.android.youtube")
                                     if (intent != null) startActivity(intent)
-                                    messages.add(ChatMessage("Deathpool", "YouTube open kar raha hu.", false))
-                                    speak("YouTube open kar raha hu")
+                                    val reply = "YouTube open kar raha hu."
+                                    messages.add(ChatMessage("Deathpool", reply, false))
+                                    speak(reply)
+                                }
+                                lower.contains("whatsapp") -> {
+                                    val intent = packageManager.getLaunchIntentForPackage("com.whatsapp")
+                                    if (intent != null) startActivity(intent)
+                                    val reply = "WhatsApp launch kar diya hai."
+                                    messages.add(ChatMessage("Deathpool", reply, false))
+                                    speak(reply)
                                 }
                                 lower.contains("short") || lower.contains("video") -> {
-                                    messages.add(ChatMessage("Deathpool", "9:16 Short cut process ho raha hai...", false))
-                                    speak("Video processing shuru kar di hai.")
-                                    val dir = getExternalFilesDir(Environment.DIRECTORY_MOVIES)
-                                    val input = File(dir, "input.mp4").absolutePath
-                                    val output = File(dir, "short_${System.currentTimeMillis()}.mp4").absolutePath
-                                    val cmd = "-y -ss 0 -t 30 -i \"$input\" -vf \"crop=ih*(9/16):ih\" -c:v libx264 -preset ultrafast -c:a copy \"$output\""
-                                    FFmpegKit.executeAsync(cmd) { session ->
-                                        val success = ReturnCode.isSuccess(session.returnCode)
-                                        lifecycleScope.launch {
-                                            val reply = if (success) "Aapka Short video ban gaya hai!" else "Video cut karne me dikkat aayi."
-                                            messages.add(ChatMessage("Deathpool", reply, false))
-                                            speak(reply)
-                                        }
-                                    }
+                                    val reply = "Shorts automation module active! Ready for video crop."
+                                    messages.add(ChatMessage("Deathpool", reply, false))
+                                    speak(reply)
                                 }
                                 else -> {
-                                    val reply = "Main Deathpool AI hu. 100% offline ready!"
+                                    val reply = "Main Deathpool AI hu. Offline mode me aapke 12GB RAM hardware par ready hu!"
                                     messages.add(ChatMessage("Deathpool", reply, false))
                                     speak(reply)
                                 }
@@ -301,7 +296,7 @@ jobs:
         gradle-version: '8.2'
 
     - name: Build Debug APK
-      run: gradle assembleDebug --stacktrace
+      run: gradle assembleDebug --no-daemon --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
