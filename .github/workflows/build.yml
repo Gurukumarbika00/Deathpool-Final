@@ -19,12 +19,17 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
+    - name: Accept Android Licenses
+      run: |
+        mkdir -p "$ANDROID_HOME/licenses"
+        echo -e "244624f2e0186834344e4564b221f0154415494d\nd56f5187479451eabf01fb78af6dfcb131a6481e\n84831b9409646a518e32853189d4f60653769dc4\n89377762660314b3f3b744d91c24e0b8de5b1a34\n7339c72e3225d004e537b78c663ade5376437993" > "$ANDROID_HOME/licenses/android-sdk-license"
+
     - name: Auto Generate All Project Files
       run: |
-        # 0. local.properties
+        # local.properties
         echo "sdk.dir=$ANDROID_HOME" > local.properties
 
-        # 1. settings.gradle.kts
+        # settings.gradle.kts
         cat << 'EOF' > settings.gradle.kts
         pluginManagement {
             repositories {
@@ -44,7 +49,7 @@ jobs:
         include(":app")
         EOF
 
-        # 2. root build.gradle.kts
+        # root build.gradle.kts
         cat << 'EOF' > build.gradle.kts
         plugins {
             id("com.android.application") version "8.2.2" apply false
@@ -52,10 +57,10 @@ jobs:
         }
         EOF
 
-        # 3. Create Folder Paths
+        # Folder structure
         mkdir -p app/src/main/java/com/deathpool/ai
 
-        # 4. app/build.gradle.kts
+        # app/build.gradle.kts
         cat << 'EOF' > app/build.gradle.kts
         plugins {
             id("com.android.application")
@@ -107,7 +112,7 @@ jobs:
         }
         EOF
 
-        # 5. AndroidManifest.xml
+        # AndroidManifest.xml
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -128,7 +133,7 @@ jobs:
         </manifest>
         EOF
 
-        # 6. MainActivity.kt (Gemini Dark Dashboard + Speech & Commands)
+        # MainActivity.kt
         cat << 'EOF' > app/src/main/java/com/deathpool/ai/MainActivity.kt
         package com.deathpool.ai
 
@@ -143,9 +148,6 @@ jobs:
         import androidx.compose.foundation.lazy.items
         import androidx.compose.foundation.shape.CircleShape
         import androidx.compose.foundation.shape.RoundedCornerShape
-        import androidx.compose.material.icons.Icons
-        import androidx.compose.material.icons.filled.ArrowUpward
-        import androidx.compose.material.icons.filled.Star
         import androidx.compose.material3.*
         import androidx.compose.runtime.*
         import androidx.compose.ui.Alignment
@@ -186,7 +188,7 @@ jobs:
                             messages.add(ChatMessage("Deathpool", reply, false))
                             speak(reply)
                         } else if (lower.contains("short") || lower.contains("video")) {
-                            val reply = "Shorts video module active hai!"
+                            val reply = "Shorts module active hai!"
                             messages.add(ChatMessage("Deathpool", reply, false))
                             speak(reply)
                         } else {
@@ -240,10 +242,10 @@ jobs:
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = null,
-                            tint = accentBlue
+                        Text(
+                            text = "✦",
+                            color = accentBlue,
+                            fontSize = 22.sp
                         )
                     }
                 },
@@ -254,15 +256,15 @@ jobs:
                             .padding(16.dp)
                             .clip(RoundedCornerShape(32.dp))
                             .background(cardBg)
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TextField(
                             value = textInput,
                             onValueChange = { textInput = it },
-                            placeholder = { Text("Command boliye ya likhiye...", color = Color.Gray, fontSize = 14.sp) },
+                            placeholder = { Text("Command boliye ya likhiye...", color = Color.Gray) },
                             modifier = Modifier.weight(1f),
-                            colors = TextFieldDefaults.colors(
+                            colors = OutlinedTextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
                                 unfocusedContainerColor = Color.Transparent,
                                 focusedTextColor = Color.White,
@@ -281,11 +283,7 @@ jobs:
                                 .clip(CircleShape)
                                 .background(accentBlue)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowUpward,
-                                contentDescription = "Send",
-                                tint = Color.White
-                            )
+                            Text(text = "▲", color = Color.White, fontSize = 16.sp)
                         }
                     }
                 }
@@ -323,7 +321,7 @@ jobs:
         gradle-version: '8.2'
 
     - name: Build Debug APK
-      run: gradle assembleDebug --no-daemon --stacktrace
+      run: gradle assembleDebug --no-daemon
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
