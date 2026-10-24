@@ -19,18 +19,13 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Accept Android Licenses
+    - name: Clean Old Files and Generate Project
       run: |
-        mkdir -p "$ANDROID_HOME/licenses"
-        echo -e "244624f2e0186834344e4564b221f0154415494d\nd56f5187479451eabf01fb78af6dfcb131a6481e\n84831b9409646a518e32853189d4f60653769dc4\n89377762660314b3f3b744d91c24e0b8de5b1a34\n7339c72e3225d004e537b78c663ade5376437993" > "$ANDROID_HOME/licenses/android-sdk-license"
+        # 1. Remove old kts files to avoid conflict
+        rm -f settings.gradle.kts build.gradle.kts app/build.gradle.kts
 
-    - name: Auto Generate All Project Files
-      run: |
-        # local.properties
-        echo "sdk.dir=$ANDROID_HOME" > local.properties
-
-        # settings.gradle.kts
-        cat << 'EOF' > settings.gradle.kts
+        # 2. settings.gradle (Groovy)
+        cat << 'EOF' > settings.gradle
         pluginManagement {
             repositories {
                 google()
@@ -46,52 +41,52 @@ jobs:
             }
         }
         rootProject.name = "DeathpoolAI"
-        include(":app")
+        include ':app'
         EOF
 
-        # root build.gradle.kts
-        cat << 'EOF' > build.gradle.kts
+        # 3. root build.gradle (Groovy)
+        cat << 'EOF' > build.gradle
         plugins {
-            id("com.android.application") version "8.2.2" apply false
-            id("org.jetbrains.kotlin.android") version "1.9.22" apply false
+            id 'com.android.application' version '8.2.2' apply false
+            id 'org.jetbrains.kotlin.android' version '1.9.22' apply false
         }
         EOF
 
-        # Folder structure
+        # 4. Folder structure
         mkdir -p app/src/main/java/com/deathpool/ai
 
-        # app/build.gradle.kts
-        cat << 'EOF' > app/build.gradle.kts
+        # 5. app/build.gradle (Groovy)
+        cat << 'EOF' > app/build.gradle
         plugins {
-            id("com.android.application")
-            id("org.jetbrains.kotlin.android")
+            id 'com.android.application'
+            id 'org.jetbrains.kotlin.android'
         }
 
         android {
-            namespace = "com.deathpool.ai"
-            compileSdk = 34
+            namespace 'com.deathpool.ai'
+            compileSdk 34
 
             defaultConfig {
-                applicationId = "com.deathpool.ai"
-                minSdk = 26
-                targetSdk = 34
-                versionCode = 1
-                versionName = "1.0"
+                applicationId "com.deathpool.ai"
+                minSdk 26
+                targetSdk 34
+                versionCode 1
+                versionName "1.0"
             }
 
             compileOptions {
-                sourceCompatibility = JavaVersion.VERSION_17
-                targetCompatibility = JavaVersion.VERSION_17
+                sourceCompatibility JavaVersion.VERSION_17
+                targetCompatibility JavaVersion.VERSION_17
             }
             kotlinOptions {
-                jvmTarget = "17"
+                jvmTarget = '17'
             }
 
             buildFeatures {
-                compose = true
+                compose true
             }
             composeOptions {
-                kotlinCompilerExtensionVersion = "1.5.8"
+                kotlinCompilerExtensionVersion '1.5.8'
             }
             packaging {
                 resources {
@@ -101,18 +96,18 @@ jobs:
         }
 
         dependencies {
-            implementation("androidx.core:core-ktx:1.12.0")
-            implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-            implementation("androidx.activity:activity-compose:1.8.2")
-            implementation(platform("androidx.compose:compose-bom:2024.02.00"))
-            implementation("androidx.compose.ui:ui")
-            implementation("androidx.compose.ui:ui-graphics")
-            implementation("androidx.compose.material3:material3")
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+            implementation 'androidx.core:core-ktx:1.12.0'
+            implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
+            implementation 'androidx.activity:activity-compose:1.8.2'
+            implementation platform('androidx.compose:compose-bom:2024.02.00')
+            implementation 'androidx.compose.ui:ui'
+            implementation 'androidx.compose.ui:ui-graphics'
+            implementation 'androidx.compose.material3:material3'
+            implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
         }
         EOF
 
-        # AndroidManifest.xml
+        # 6. AndroidManifest.xml
         cat << 'EOF' > app/src/main/AndroidManifest.xml
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -133,7 +128,7 @@ jobs:
         </manifest>
         EOF
 
-        # MainActivity.kt
+        # 7. MainActivity.kt (Robust Gemini Dashboard + Offline Voice)
         cat << 'EOF' > app/src/main/java/com/deathpool/ai/MainActivity.kt
         package com.deathpool.ai
 
@@ -171,39 +166,34 @@ jobs:
                 setContent {
                     val messages = remember { mutableStateListOf<ChatMessage>() }
 
-                    fun submitQuery(userText: String) {
-                        messages.add(ChatMessage("User", userText, true))
-                        val lower = userText.lowercase()
-
-                        if (lower.contains("youtube")) {
-                            val intent = packageManager.getLaunchIntentForPackage("com.google.android.youtube")
-                            if (intent != null) startActivity(intent)
-                            val reply = "YouTube open kar raha hu."
+                    GeminiDashboard(
+                        messages = messages,
+                        onSend = { query ->
+                            messages.add(ChatMessage("User", query, true))
+                            val lower = query.lowercase(Locale.ROOT)
+                            val reply = when {
+                                lower.contains("youtube") -> {
+                                    val intent = packageManager.getLaunchIntentForPackage("com.google.android.youtube")
+                                    if (intent != null) startActivity(intent)
+                                    "YouTube open kar raha hu."
+                                }
+                                lower.contains("whatsapp") -> {
+                                    val intent = packageManager.getLaunchIntentForPackage("com.whatsapp")
+                                    if (intent != null) startActivity(intent)
+                                    "WhatsApp launch kar diya hai."
+                                }
+                                lower.contains("short") || lower.contains("video") -> {
+                                    "Shorts automation ready hai!"
+                                }
+                                else -> {
+                                    "Main Deathpool AI hu. 12GB RAM hardware par offline ready!"
+                                }
+                            }
                             messages.add(ChatMessage("Deathpool", reply, false))
-                            speak(reply)
-                        } else if (lower.contains("whatsapp")) {
-                            val intent = packageManager.getLaunchIntentForPackage("com.whatsapp")
-                            if (intent != null) startActivity(intent)
-                            val reply = "WhatsApp launch kar diya hai."
-                            messages.add(ChatMessage("Deathpool", reply, false))
-                            speak(reply)
-                        } else if (lower.contains("short") || lower.contains("video")) {
-                            val reply = "Shorts module active hai!"
-                            messages.add(ChatMessage("Deathpool", reply, false))
-                            speak(reply)
-                        } else {
-                            val reply = "Main Deathpool AI hu. 12GB RAM par offline ready!"
-                            messages.add(ChatMessage("Deathpool", reply, false))
-                            speak(reply)
+                            tts?.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "AI_VOICE")
                         }
-                    }
-
-                    GeminiDashboard(messages, onSend = { submitQuery(it) })
+                    )
                 }
-            }
-
-            private fun speak(text: String) {
-                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "AI_VOICE")
             }
 
             override fun onInit(status: Int) {
@@ -243,9 +233,9 @@ jobs:
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "✦",
+                            text = "★",
                             color = accentBlue,
-                            fontSize = 22.sp
+                            fontSize = 20.sp
                         )
                     }
                 },
@@ -263,13 +253,7 @@ jobs:
                             value = textInput,
                             onValueChange = { textInput = it },
                             placeholder = { Text("Command boliye ya likhiye...", color = Color.Gray) },
-                            modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White
-                            )
+                            modifier = Modifier.weight(1f)
                         )
                         IconButton(
                             onClick = {
@@ -287,11 +271,11 @@ jobs:
                         }
                     }
                 }
-            ) { p ->
+            ) { paddingValues ->
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(p)
+                        .padding(paddingValues)
                         .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
